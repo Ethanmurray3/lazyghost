@@ -26,14 +26,43 @@ with a `custom-shader = ...` line and asks Ghostty to reload.
 
 ## Install From GitHub
 
-After this repo is pushed to GitHub:
-
 ```sh
 go install github.com/Ethanmurray3/lazyghost@latest
+```
+
+Go downloads the source, builds it for your computer, and installs the binary to:
+
+```sh
+$(go env GOPATH)/bin
+```
+
+For most setups, that is:
+
+```text
+~/go/bin/lazyghost
+```
+
+Then run:
+
+```sh
+~/go/bin/lazyghost
+```
+
+To run it as `lazyghost` from anywhere, add Go's bin directory to your `PATH`:
+
+```sh
+echo 'export PATH="$HOME/go/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
 ```
 
 Then run:
 
 ```sh
 lazyghost
+```
+
+To update later:
+
+```sh
+go install github.com/Ethanmurray3/lazyghost@latest
 ```
