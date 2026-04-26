@@ -5,12 +5,12 @@ A small Bubble Tea TUI for switching Ghostty custom shaders.
 ## Usage
 
 ```sh
-go run .
+go run ./cmd/lazyghost
 ```
 
 Use `j`/`down` and `k`/`up` to move, then press `enter` or `space` to apply a shader.
 
-lazyghost embeds the shader files from `shaders/` into the binary. When you apply a shader, it installs that shader to:
+lazyghost embeds the shader files from `internal/shaders/` into the binary. When you apply a shader, it installs that shader to:
 
 ```text
 ~/.config/ghostty/lazyghost-shaders/
@@ -54,7 +54,7 @@ source ~/.zshrc
 ### Install With Go
 
 ```sh
-go install github.com/Ethanmurray3/lazyghost@latest
+go install github.com/Ethanmurray3/lazyghost/cmd/lazyghost@latest
 ```
 
 Go downloads the source, builds it for your computer, and installs the binary to:
@@ -91,5 +91,5 @@ lazyghost
 To update later:
 
 ```sh
-go install github.com/Ethanmurray3/lazyghost@latest
+go install github.com/Ethanmurray3/lazyghost/cmd/lazyghost@latest
 ```
