@@ -1,0 +1,4 @@
+lazyghost
+*.test
+.DS_Store
+nvim.log
