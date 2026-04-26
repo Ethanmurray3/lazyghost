@@ -21,6 +21,11 @@ type shader struct {
 	filename string
 }
 
+var ghosttyLinuxServices = []string{
+	"app-com.mitchellh.ghostty.service",
+	"app-com.mitchellh.ghostty-debug.service",
+}
+
 type model struct {
 	configPath string
 	shaderDir  string
@@ -30,14 +35,9 @@ type model struct {
 }
 
 func initialModel() model {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		home = ""
-	}
-
-	shaderDir := filepath.Join(home, ".config", "ghostty", "lazyghost-shaders")
+	configPath, shaderDir := resolveGhosttyPaths()
 	return model{
-		configPath: filepath.Join(home, ".config", "ghostty", "config.ghostty"),
+		configPath: configPath,
 		shaderDir:  shaderDir,
 		shaders: []shader{
 			{name: "disable"},
@@ -52,6 +52,51 @@ func initialModel() model {
 		},
 		cursor: 0,
 	}
+}
+
+func resolveGhosttyPaths() (configPath, shaderDir string) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", ""
+	}
+
+	configHome := os.Getenv("XDG_CONFIG_HOME")
+	if configHome == "" {
+		configHome = filepath.Join(home, ".config")
+	}
+
+	xdgDir := filepath.Join(configHome, "ghostty")
+	shaderDir = filepath.Join(xdgDir, "lazyghost-shaders")
+
+	xdgCandidates := []string{
+		filepath.Join(xdgDir, "config.ghostty"),
+		filepath.Join(xdgDir, "config"),
+	}
+
+	if runtime.GOOS == "darwin" {
+		macDir := filepath.Join(home, "Library", "Application Support", "com.mitchellh.ghostty")
+		for _, path := range []string{
+			filepath.Join(macDir, "config.ghostty"),
+			filepath.Join(macDir, "config"),
+		} {
+			if fileExists(path) {
+				return path, shaderDir
+			}
+		}
+	}
+
+	for _, path := range xdgCandidates {
+		if fileExists(path) {
+			return path, shaderDir
+		}
+	}
+
+	return xdgCandidates[0], shaderDir
+}
+
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
 }
 
 type shaderSavedMsg struct {
@@ -153,9 +198,16 @@ func saveShader(configPath, shaderPath string) error {
 		return errors.New("could not resolve Ghostty config path")
 	}
 
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
+		return err
+	}
+
 	config, err := os.ReadFile(configPath)
 	if err != nil {
-		return err
+		if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		config = nil
 	}
 
 	line := "# custom-shader ="
@@ -164,6 +216,9 @@ func saveShader(configPath, shaderPath string) error {
 	}
 
 	lines := strings.Split(string(config), "\n")
+	if len(lines) == 1 && lines[0] == "" {
+		lines = nil
+	}
 	replaced := false
 	for i, existing := range lines {
 		trimmed := strings.TrimSpace(existing)
@@ -230,15 +285,47 @@ end tell
 }
 
 func reloadGhosttyLinux() error {
+	var errs []string
+
+	if err := reloadGhosttyLinuxSystemd(); err == nil {
+		return nil
+	} else if err.Error() != "" {
+		errs = append(errs, "systemd: "+err.Error())
+	}
+
 	if err := reloadGhosttyLinuxDBus(); err == nil {
 		return nil
+	} else if err.Error() != "" {
+		errs = append(errs, "dbus: "+err.Error())
+	}
+
+	if err := reloadGhosttyLinuxSignal(); err == nil {
+		return nil
+	} else if err.Error() != "" {
+		errs = append(errs, "signal: "+err.Error())
 	}
 
 	if err := reloadGhosttyLinuxXDoTool(); err == nil {
 		return nil
+	} else if err.Error() != "" {
+		errs = append(errs, "xdotool: "+err.Error())
 	}
 
-	return errors.New("could not reload Ghostty; install gdbus/xdotool or bind reload_config and reload manually")
+	return fmt.Errorf("could not reload Ghostty (%s)", strings.Join(errs, "; "))
+}
+
+func reloadGhosttyLinuxSystemd() error {
+	var errs []string
+	for _, service := range ghosttyLinuxServices {
+		cmd := exec.Command("systemctl", "reload", "--user", service)
+		if output, err := cmd.CombinedOutput(); err == nil {
+			return nil
+		} else {
+			errs = append(errs, strings.TrimSpace(string(output)))
+		}
+	}
+
+	return errors.New(strings.Join(errs, "; "))
 }
 
 func reloadGhosttyLinuxDBus() error {
@@ -267,13 +354,33 @@ func reloadGhosttyLinuxDBus() error {
 }
 
 func reloadGhosttyLinuxXDoTool() error {
-	cmd := exec.Command(
-		"xdotool",
+	cmd := exec.Command("xdotool", ghosttyLinuxXDoToolArgs()...)
+	return cmd.Run()
+}
+
+func reloadGhosttyLinuxSignal() error {
+	cmd := exec.Command("pkill", ghosttyLinuxSignalArgs()...)
+	if output, err := cmd.CombinedOutput(); err == nil {
+		return nil
+	} else {
+		msg := strings.TrimSpace(string(output))
+		if msg == "" {
+			msg = err.Error()
+		}
+		return errors.New(msg)
+	}
+}
+
+func ghosttyLinuxSignalArgs() []string {
+	return []string{"-USR2", "-x", "ghostty"}
+}
+
+func ghosttyLinuxXDoToolArgs() []string {
+	return []string{
 		"search", "--class", "ghostty",
 		"windowactivate", "--sync",
-		"key", "super+shift+comma",
-	)
-	return cmd.Run()
+		"key", "ctrl+shift+comma",
+	}
 }
 
 func main() {
