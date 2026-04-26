@@ -1,4 +1,5 @@
 lazyghost
+dist/
 *.test
 .DS_Store
 nvim.log

@@ -26,6 +26,33 @@ with a `custom-shader = ...` line and asks Ghostty to reload.
 
 ## Install From GitHub
 
+Recommended:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Ethanmurray3/lazyghost/main/install.sh | sh
+```
+
+This downloads the latest release binary for your OS/CPU and installs it to:
+
+```text
+~/.local/bin/lazyghost
+```
+
+Then run:
+
+```sh
+lazyghost
+```
+
+If `~/.local/bin` is not on your `PATH`, add it:
+
+```sh
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+### Install With Go
+
 ```sh
 go install github.com/Ethanmurray3/lazyghost@latest
 ```
